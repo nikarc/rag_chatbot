@@ -1,6 +1,9 @@
 import os
+import json
+import glob
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFDirectoryLoader
+from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
@@ -15,11 +18,28 @@ CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
 
+def load_json_documents():
+    """Load JSON files from the data/ directory, flattening nested objects to text."""
+    documents = []
+    for path in glob.glob(os.path.join(DATA_DIR, "**/*.json"), recursive=True):
+        with open(path) as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            for i, item in enumerate(data):
+                text = json.dumps(item, indent=2)
+                documents.append(Document(page_content=text, metadata={"source": path, "index": i}))
+        else:
+            text = json.dumps(data, indent=2)
+            documents.append(Document(page_content=text, metadata={"source": path}))
+    return documents
+
+
 def load_documents():
-    """Load PDF documents from the data/ directory"""
-    loader = PyPDFDirectoryLoader(DATA_DIR)
-    documents = loader.load()
-    print(f"Loaded {len(documents)} pages from {DATA_DIR}/")
+    """Load PDF and JSON documents from the data/ directory."""
+    pdf_docs = PyPDFDirectoryLoader(DATA_DIR).load()
+    json_docs = load_json_documents()
+    documents = pdf_docs + json_docs
+    print(f"Loaded {len(pdf_docs)} PDF pages and {len(json_docs)} JSON documents from {DATA_DIR}/")
     return documents
 
 
